@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diamond Showdown</title>
+<style>
+:root{--bg:#071321;--panel:#10243a;--line:#29445f;--gold:#ffd166;--green:#3bd18a;--muted:#9bb0c5}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0%,#183b58,#071321 65%);color:#f4f8fc;font:15px/1.4 system-ui,Segoe UI,Arial;min-height:100vh}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px max(16px,calc((100vw - 1100px)/2));border-bottom:1px solid #29445f;background:#071321cc}
+h1{font-size:clamp(20px,3vw,30px);margin:0;letter-spacing:1px}h1 span{color:var(--gold)}.sub{color:var(--muted);font-size:12px}
+main{max-width:1100px;margin:18px auto;padding:0 14px;display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:14px}
+.panel{background:linear-gradient(145deg,#122b43,#0c1c2e);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 14px 35px #0005}
+.scoreboard{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:12px 16px;gap:10px;background:#091827}
+.team{text-align:center}.team b{display:block;font-size:20px}.team small{color:var(--muted)}.score{font-size:30px;font-weight:800}.inning{text-align:center;color:var(--gold);font-size:12px;font-weight:700}
+canvas{display:block;width:100%;height:auto;background:#183d32;cursor:crosshair}
+.controls{padding:14px 16px}.controls h2,.side h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin:0 0 9px}
+.controls p{margin:5px 0;color:#c5d3df}.keys{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+kbd{background:#071321;border:1px solid #45617a;border-bottom-width:3px;border-radius:6px;padding:4px 8px;font:700 12px system-ui;color:#fff}
+.side{padding:15px}.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.stat{background:#081827;border:1px solid #223d55;border-radius:9px;padding:9px}.stat small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}.stat b{font-size:20px}
+button,select{font:inherit;color:#fff;background:#1a3854;border:1px solid #42617e;border-radius:8px;padding:9px 12px;cursor:pointer}
+button:hover{background:#265071}button.primary{background:#bd7b19;border-color:#e3a83e;color:#101820;font-weight:800}
+button:disabled{opacity:.45;cursor:not-allowed}.wide{width:100%;margin-top:8px}
+#message{min-height:54px;padding:10px 12px;background:#081827;border:1px solid #29445f;border-radius:9px;color:#dce8f2;margin:10px 0}
+#log{height:120px;overflow:auto;color:#9fb4c7;font-size:12px;border-top:1px solid #29445f;padding-top:8px}
+.meter{height:9px;background:#06111d;border-radius:20px;overflow:hidden;margin:7px 0}.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,#38d58b,#ffd166,#ed6b5e)}
+footer{max-width:1100px;margin:0 auto 20px;padding:0 14px;color:#8299ae;font-size:11px}
+@media(max-width:780px){main{grid-template-columns:1fr}.side{order:2}header{padding:12px 16px}}
+</style>
+</head>
+<body>
+<header><div><h1>DIAMOND <span>SHOWDOWN</span></h1><div class="sub">A keyboard baseball game for your PC</div></div><div class="sub">EXHIBITION • 3 INNINGS</div></header>
+<main>
+<section class="panel">
+<div class="scoreboard">
+ <div class="team"><b>HOME</b><small id="homeName">Comets</small><div class="score" id="homeScore">0</div></div>
+ <div class="inning"><div id="inningText">TOP 1</div><small id="countText">0-0 • 0 OUT</small></div>
+ <div class="team"><b>AWAY</b><small id="awayName">Wolves</small><div class="score" id="awayScore">0</div></div>
+</div>
+<canvas id="field" width="900" height="570"></canvas>
+<div class="controls">
+ <h2 id="phaseTitle">At bat</h2>
+ <div id="message">Welcome to Diamond Showdown. You're up to bat! Watch the pitch and swing at the right moment.</div>
+ <div class="meter"><i id="timingMeter"></i></div>
+ <div class="keys" id="keys"><kbd>SPACE</kbd> Swing <kbd>←</kbd>/<kbd>→</kbd> Aim <kbd>R</kbd> Reset game</div>
+</div>
+</section>
+<aside class="panel side">
+<h2>Game control</h2>
+<div class="statgrid">
+ <div class="stat"><small>Hits</small><b id="hits">0</b></div><div class="stat"><small>Strikeouts</small><b id="ks">0</b></div>
+ <div class="stat"><small>Home runs</small><b id="hrs">0</b></div><div class="stat"><small>Pitch speed</small><b id="speed">92</b></div>
+</div>
+<div class="stat"><small>Batting / pitching</small><b id="role">Batting</b></div>
+<button class="primary wide" id="actionBtn">Start pitch</button>
+<button class="wide" id="newBtn">New game</button>
+<div style="height:12px"></div>
+<h2>Box score notes</h2><div id="log">• First pitch coming up.</div>
+<div style="height:12px"></div>
+<h2>How to play</h2>
+<p><b>Batting:</b> Press SPACE as the ball reaches the plate. Use ← / → to aim.</p>
+<p><b>Pitching:</b> When the sides switch, choose a pitch with 1, 2, or 3, aim with ← / →, then press SPACE.</p>
+<p><b>Fielding:</b> On a ball in play, use the arrow keys to move the fielder toward the ball. Press SPACE to throw.</p>
+</aside>
+</main>
+<footer>Fan-made arcade baseball prototype. No MLB teams, players, logos, or licensed content. Best on a computer with a keyboard.</footer>
+<script>
+const canvas=document.getElementById('field'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+let state={inning:1,half:0,outs:0,balls:0,strikes:0,home:0,away:0,hits:0,ks:0,hrs:0,bases:0,phase:'bat',pitching:false,pitch:null,pitchX:0,pitchY:0,aim:0,fieldX:450,fieldY:260,ballX:450,ballY:310,ballVx:0,ballVy:0,flight:0,anim:0,gameOver:false,waiting:false,scoreThisPlay:false};
+const rand=(a,b)=>Math.random()*(b-a)+a;
+function log(s){$('log').innerHTML='• '+s+'<br>'+ $('log').innerHTML}
+function msg(s){$('message').textContent=s}
+function update(){
+$('homeScore').textContent=state.home;$('awayScore').textContent=state.away;
+$('inningText').textContent=(state.half===0?'TOP ':'BOTTOM ')+state.inning;
+$('countText').textContent=`${state.balls}-${state.strikes} • ${state.outs} OUT`;
+$('hits').textContent=state.hits;$('ks').textContent=state.ks;$('hrs').textContent=state.hrs;
+$('role').textContent=state.phase==='bat'?'Batting':state.phase==='pitch'?'Pitching':'Fielding';
+$('phaseTitle').textContent=state.phase==='bat'?'At bat':state.phase==='pitch'?'On the mound':'Make the play';
+$('actionBtn').textContent=state.phase==='bat'?'Start pitch':state.phase==='pitch'?'Throw pitch':'Continue';
+$('actionBtn').disabled=state.waiting||state.gameOver;
+}
+function draw(){
+ctx.clearRect(0,0,900,570);
+// stadium
+ctx.fillStyle='#17384b';ctx.fillRect(0,0,900,570);
+for(let i=0;i<9;i++){ctx.fillStyle=i%2?'#214b5a':'#1d4352';ctx.fillRect(i*100,0,100,100)}
+ctx.fillStyle='#2f7c45';ctx.fillRect(0,95,900,475);
+// outfield stripes
+for(let i=0;i<8;i++){ctx.fillStyle=i%2?'#337f49':'#2e7542';ctx.beginPath();ctx.moveTo(450,300);ctx.lineTo(i*130-170,95);ctx.lineTo(i*130-90,95);ctx.closePath();ctx.fill()}
+// foul lines and diamond
+ctx.strokeStyle='#f3e8ca';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(450,465);ctx.lineTo(120,130);ctx.moveTo(450,465);ctx.lineTo(780,130);ctx.stroke();
+ctx.fillStyle='#bd8654';ctx.beginPath();ctx.moveTo(450,465);ctx.lineTo(290,305);ctx.lineTo(450,145);ctx.lineTo(610,305);ctx.closePath();ctx.fill();
+ctx.fillStyle='#3a8b4c';ctx.beginPath();ctx.moveTo(450,420);ctx.lineTo(340,310);ctx.lineTo(450,200);ctx.lineTo(560,310);ctx.closePath();ctx.fill();
+// bases
+[[450,465],[290,305],[450,145],[610,305]].forEach(([x,y])=>{ctx.fillStyle='#fff7e7';ctx.fillRect(x-9,y-9,18,18)});
+// mound and plate
+ctx.fillStyle='#b67c4e';ctx.beginPath();ctx.ellipse(450,310,35,19,0,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(450,478);ctx.lineTo(438,468);ctx.lineTo(442,455);ctx.lineTo(458,455);ctx.lineTo(462,468);ctx.closePath();ctx.fill();
+// fielders
+const fs=[[450,160],[220,210],[680,210],[330,260],[570,260],[365,365],[535,365]];
+fs.forEach(([x,y],i)=>{ctx.fillStyle='#e5edf4';ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fill();ctx.fillStyle='#17314b';ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fill()});
+// batter/pitcher
+ctx.fillStyle='#ffd166';ctx.beginPath();ctx.arc(480,450,13,0,Math.PI*2);ctx.fill();ctx.fillRect(472,462,16,27);
+ctx.strokeStyle='#e7c18b';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(488,454);ctx.lineTo(507,432);ctx.stroke();
+ctx.fillStyle='#e76f51';ctx.beginPath();ctx.arc(450,288,11,0,Math.PI*2);ctx.fill();ctx.fillRect(442,299,16,27);
+// aim indicator
+if(state.phase==='bat'||state.phase==='pitch'){ctx.strokeStyle='#ffffff88';ctx.lineWidth=2;ctx.beginPath();ctx.arc(450+state.aim*25,445,25,0,Math.PI*2);ctx.stroke()}
+// ball
+if(state.pitch||state.phase==='field'){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(state.ballX,state.ballY,7,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#d34d4d';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(state.ballX,state.ballY,5,-1,1);ctx.stroke()}
+// fielding player
+if(state.phase==='field'){ctx.strokeStyle='#ffd166';ctx.lineWidth=3;ctx.beginPath();ctx.arc(state.fieldX,state.fieldY,17,0,Math.PI*2);ctx.stroke()}
+// overlay
+if(state.gameOver){ctx.fillStyle='#061321cc';ctx.fillRect(0,0,900,570);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 48px system-ui';ctx.fillText(state.home===state.away?'TIE GAME':state.home>state.away?'HOME TEAM WINS':'AWAY TEAM WINS',450,265);ctx.font='20px system-ui';ctx.fillText('Press R or New Game to play again',450,310)}
+}
+function animate(){state.anim++;if(state.pitch){state.ballX+=state.ballVx;state.ballY+=state.ballVy;state.pitch.t--;if(state.pitch.t<=0){state.pitch=null;if(state.phase==='bat'){state.waiting=false;resolveTake()}else if(state.phase==='pitch'){state.waiting=false;msg('Pitch delivered. The batter is ready.');}}}
+if(state.phase==='field'&&state.flight>0){state.ballX+=state.ballVx;state.ballY+=state.ballVy;state.flight--;if(state.flight<=0){state.waiting=false;finishHit()}}
+draw();requestAnimationFrame(animate)}
+function startPitch(){
+if(state.gameOver||state.waiting)return;
+if(state.phase==='bat'){
+ state.pitch={t:65};state.ballX=450;state.ballY=285;state.ballVx=0;state.ballVy=2.5;
+ state.waiting=true;state.swingWindow=false;
+ msg('Pitch on the way… time your swing!');$('timingMeter').style.width='0%';
+ let start=performance.now();let tick=()=>{if(!state.pitch)return;let p=Math.min(100,(performance.now()-start)/650*100);$('timingMeter').style.width=p+'%';if(p<100)requestAnimationFrame(tick)};tick();
+}else if(state.phase==='pitch'){throwPitch()}
+else if(state.phase==='field'){finishHit()}
+}
+function resolveTake(){
+state.pitch=null;state.ballX=450;state.ballY=310;
+// AI pitch location and call
+let strike=Math.random()<.63;
+if(strike){state.strikes++;msg('Called strike!');log('Called strike.')}
+else{state.balls++;msg('Ball. Take your base at four.');log('Ball outside the zone.')}
+if(state.strikes>=3){state.outs++;state.ks++;state.strikes=0;state.balls=0;msg('Strike three! Batter is out.');log('Strikeout.')}
+if(state.balls>=4){state.bases=Math.min(3,state.bases+1);state.balls=0;state.strikes=0;msg('Walk! Batter takes first.');log('Walk.')}
+afterCount();
+}
+function swing(){
+if(state.phase!=='bat'||!state.pitch||!state.waiting)return;
+let y=state.ballY;let diff=Math.abs(y-430);let quality=Math.max(0,1-diff/100);
+let contact=Math.random()<(.25+quality*.7);
+state.pitch=null;state.waiting=false;
+if(contact){
+ let power=quality*rand(.6,1.4);let distance=power*rand(210,390);
+ state.hits++;let isHR=distance>340&&Math.random()<.7;
+ state.ballX=450;state.ballY=430;state.ballVx=(state.aim*2.3+rand(-1.2,1.2))*3;state.ballVy=-rand(4.5,8);
+ state.flight=45;state.phase='field';state.waiting=true;state.hitType=isHR?'home run':distance>280?'extra-base hit':'single';
+ msg(quality>.75?'Crushed! The ball is in play!':'Contact! The ball is in play!');log('Ball put in play.');
+}else{
+ state.strikes++;msg('Swing and a miss!');log('Swing and a miss.');
+ if(state.strikes>=3){state.outs++;state.ks++;state.strikes=0;state.balls=0;msg('Strike three!');}
+ afterCount();
+}
+}
+function finishHit(){
+state.flight=0;state.waiting=false;
+let type=state.hitType||'single';
+if(type==='home run'){let runs=1+state.bases;state.home+=state.half===0?0:runs;state.away+=state.half===0?runs:0;state.bases=0;state.hrs++;msg(`HOME RUN! ${runs} run${runs>1?'s':''} score!`);log(`Home run — ${runs} run(s).`)}
+else{state.bases=Math.min(3,state.bases+1);if(state.bases===3&&type==='extra-base hit'){let runs=state.half===0?1:1; if(state.half===0)state.away+=runs;else state.home+=runs;state.bases=0;msg('Run scores on the hit!')}else msg(type==='extra-base hit'?'Extra-base hit!':'Single!');log(type+'.')}
+state.phase='bat';state.hitType=null;state.aim=0;afterCount(true);
+}
+function afterCount(hit=false){
+update();
+if(state.outs>=3){state.outs=0;state.balls=0;state.strikes=0;state.bases=0;
+ if(state.half===0){state.half=1;state.phase='pitch';msg('Side retired. You are pitching in the bottom half.');log('Teams switch sides.')}
+ else{state.half=0;state.inning++;state.phase='bat';msg('Inning complete. Back to batting.');log('New inning.')}
+ if(state.inning>3){state.gameOver=true;msg('Game over!');}
+}
+update();
+}
+function throwPitch(){
+if(state.waiting)return;
+state.waiting=true;state.pitch={t:45};state.ballX=450;state.ballY=288;state.ballVx=state.aim*.4;state.ballVy=3.4;
+$('speed').textContent=Math.round(rand(88,99));msg('You deliver the pitch…');log('Pitch thrown.');
+setTimeout(()=>{if(state.phase!=='pitch')return;state.pitch=null;state.waiting=false;
+ if(Math.random()<.35){state.outs++;msg('The batter grounds out!');log('Groundout.');afterCount()}
+ else{state.phase='field';state.ballX=450;state.ballY=330;state.ballVx=rand(-5,5);state.ballVy=rand(2,5);state.flight=25;state.waiting=true;msg('Ball in play! Move your fielder with the arrow keys.')}
+},750);
+}
+function reset(){state={inning:1,half:0,outs:0,balls:0,strikes:0,home:0,away:0,hits:0,ks:0,hrs:0,bases:0,phase:'bat',pitching:false,pitch:null,pitchX:0,pitchY:0,aim:0,fieldX:450,fieldY:260,ballX:450,ballY:310,ballVx:0,ballVy:0,flight:0,anim:0,gameOver:false,waiting:false,scoreThisPlay:false};$('log').innerHTML='• First pitch coming up.';msg('New game! Step into the batter’s box.');$('speed').textContent='92';update()}
+document.addEventListener('keydown',e=>{
+if(['ArrowLeft','ArrowRight',' ','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();
+if(e.key.toLowerCase()==='r'){reset();return}
+if(e.key==='ArrowLeft'||e.key==='ArrowRight'){let d=e.key==='ArrowLeft'?-1:1;if(state.phase==='field'){state.fieldX=Math.max(80,Math.min(820,state.fieldX+d*22));state.fieldY=Math.max(120,Math.min(450,state.fieldY));}else state.aim=Math.max(-3,Math.min(3,state.aim+d));}
+if(e.key==='ArrowUp'&&state.phase==='field')state.fieldY-=20;
+if(e.key==='ArrowDown'&&state.phase==='field')state.fieldY+=20;
+if(e.code==='Space'){if(state.phase==='bat')swing();else if(state.phase==='pitch')throwPitch();else if(state.phase==='field'){state.waiting=false;finishHit()}}
+if(['1','2','3'].includes(e.key)&&state.phase==='pitch'){state.pitchType=e.key;msg(['Fastball selected','Curveball selected','Changeup selected'][+e.key-1])}
+});
+$('actionBtn').onclick=startPitch;$('newBtn').onclick=reset;update();draw();requestAnimationFrame(animate);
+</script>
+</body></html
+           
+ 
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diamond Showdown</title>
+<style>
+:root{--bg:#071321;--panel:#10243a;--line:#29445f;--gold:#ffd166;--green:#3bd18a;--muted:#9bb0c5}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0%,#183b58,#071321 65%);color:#f4f8fc;font:15px/1.4 system-ui,Segoe UI,Arial;min-height:100vh}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px max(16px,calc((100vw - 1100px)/2));border-bottom:1px solid #29445f;background:#071321cc}
+h1{font-size:clamp(20px,3vw,30px);margin:0;letter-spacing:1px}h1 span{color:var(--gold)}.sub{color:var(--muted);font-size:12px}
+main{max-width:1100px;margin:18px auto;padding:0 14px;display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:14px}
+.panel{background:linear-gradient(145deg,#122b43,#0c1c2e);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 14px 35px #0005}
+.scoreboard{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:12px 16px;gap:10px;background:#091827}
+.team{text-align:center}.team b{display:block;font-size:20px}.team small{color:var(--muted)}.score{font-size:30px;font-weight:800}.inning{text-align:center;color:var(--gold);font-size:12px;font-weight:700}
+canvas{display:block;width:100%;height:auto;background:#183d32;cursor:crosshair}
+.controls{padding:14px 16px}.controls h2,.side h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin:0 0 9px}
+.controls p{margin:5px 0;color:#c5d3df}.keys{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+kbd{background:#071321;border:1px solid #45617a;border-bottom-width:3px;border-radius:6px;padding:4px 8px;font:700 12px system-ui;color:#fff}
+.side{padding:15px}.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.stat{background:#081827;border:1px solid #223d55;border-radius:9px;padding:9px}.stat small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}.stat b{font-size:20px}
+button,select{font:inherit;color:#fff;background:#1a3854;border:1px solid #42617e;border-radius:8px;padding:9px 12px;cursor:pointer}
+button:hover{background:#265071}button.primary{background:#bd7b19;border-color:#e3a83e;color:#101820;font-weight:800}
+button:disabled{opacity:.45;cursor:not-allowed}.wide{width:100%;margin-top:8px}
+#message{min-height:54px;padding:10px 12px;background:#081827;border:1px solid #29445f;border-radius:9px;color:#dce8f2;margin:10px 0}
+#log{height:120px;overflow:auto;color:#9fb4c7;font-size:12px;border-top:1px solid #29445f;padding-top:8px}
+.meter{height:9px;background:#06111d;border-radius:20px;overflow:hidden;margin:7px 0}.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,#38d58b,#ffd166,#ed6b5e)}
+footer{max-width:1100px;margin:0 auto 20px;padding:0 14px;color:#8299ae;font-size:11px}
+@media(max-width:780px){main{grid-template-columns:1fr}.side{order:2}header{padding:12px 16px}}
+</style>
+</head>
+<body>
+<header><div><h1>DIAMOND <span>SHOWDOWN</span></h1><div class="sub">A keyboard baseball game for your PC</div></div><div class="sub">EXHIBITION • 3 INNINGS</div></header>
+<main>
+<section class="panel">
+<div class="scoreboard">
+ <div class="team"><b>HOME</b><small id="homeName">Comets</small><div class="score" id="homeScore">0</div></div>
+ <div class="inning"><div id="inningText">TOP 1</div><small id="countText">0-0 • 0 OUT</small></div>
+ <div class="team"><b>AWAY</b><small id="awayName">Wolves</small><div class="score" id="awayScore">0</div></div>
+</div>
+<canvas id="field" width="900" height="570"></canvas>
+<div class="controls">
+ <h2 id="phaseTitle">At bat</h2>
+ <div id="message">Welcome to Diamond Showdown. You're up to bat! Watch the pitch and swing at the right moment.</div>
+ <div class="meter"><i id="timingMeter"></i></div>
+ <div class="keys" id="keys"><kbd>SPACE</kbd> Swing <kbd>←</kbd>/<kbd>→</kbd> Aim <kbd>R</kbd> Reset game</div>
+</div>
+</section>
+<aside class="panel side">
+<h2>Game control</h2>
+<div class="statgrid">
+ <div class="stat"><small>Hits</small><b id="hits">0</b></div><div class="stat"><small>Strikeouts</small><b id="ks">0</b></div>
+ <div class="stat"><small>Home runs</small><b id="hrs">0</b></div><div class="stat"><small>Pitch speed</small><b id="speed">92</b></div>
+</div>
+<div class="stat"><small>Batting / pitching</small><b id="role">Batting</b></div>
+<button class="primary wide" id="actionBtn">Start pitch</button>
+<button class="wide" id="newBtn">New game</button>
+<div style="height:12px"></div>
+<h2>Box score notes</h2><div id="log">• First pitch coming up.</div>
+<div style="height:12px"></div>
+<h2>How to play</h2>
+<p><b>Batting:</b> Press SPACE as the ball reaches the plate. Use ← / → to aim.</p>
+<p><b>Pitching:</b> When the sides switch, choose a pitch with 1, 2, or 3, aim with ← / →, then press SPACE.</p>
+<p><b>Fielding:</b> On a ball in play, use the arrow keys to move the fielder toward the ball. Press SPACE to throw.</p>
+</aside>
+</main>
+<footer>Fan-made arcade baseball prototype. No MLB teams, players, logos, or licensed content. Best on a computer with a keyboard.</footer>
+<script>
+const canvas=document.getElementById('field'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+let state={inning:1,half:0,outs:0,balls:0,strikes:0,home:0,away:0,hits:0,ks:0,hrs:0,bases:0,phase:'bat',pitching:false,pitch:null,pitchX:0,pitchY:0,aim:0,fieldX:450,fieldY:260,ballX:450,ballY:310,ballVx:0,ballVy:0,flight:0,anim:0,gameOver:false,waiting:false,scoreThisPlay:false};
+const rand=(a,b)=>Math.random()*(b-a)+a;
+function log(s){$('log').innerHTML='• '+s+'<br>'+ $('log').innerHTML}
+function msg(s){$('message').textContent=s}
+function update(){
+$('homeScore').textContent=state.home;$('awayScore').textContent=state.away;
+$('inningText').textContent=(state.half===0?'TOP ':'BOTTOM ')+state.inning;
+$('countText').textContent=`${state.balls}-${state.strikes} • ${state.outs} OUT`;
+$('hits').textContent=state.hits;$('ks').textContent=state.ks;$('hrs').textContent=state.hrs;
+$('role').textContent=state.phase==='bat'?'Batting':state.phase==='pitch'?'Pitching':'Fielding';
+$('phaseTitle').textContent=state.phase==='bat'?'At bat':state.phase==='pitch'?'On the mound':'Make the play';
+$('actionBtn').textContent=state.phase==='bat'?'Start pitch':state.phase==='pitch'?'Throw pitch':'Continue';
+$('actionBtn').disabled=state.waiting||state.gameOver;
+}
+function draw(){
+ctx.clearRect(0,0,900,570);
+// stadium
+ctx.fillStyle='#17384b';ctx.fillRect(0,0,900,570);
+for(let i=0;i<9;i++){ctx.fillStyle=i%2?'#214b5a':'#1d4352';ctx.fillRect(i*100,0,100,100)}
+ctx.fillStyle='#2f7c45';ctx.fillRect(0,95,900,475);
+// outfield stripes
+for(let i=0;i<8;i++){ctx.fillStyle=i%2?'#337f49':'#2e7542';ctx.beginPath();ctx.moveTo(450,300);ctx.lineTo(i*130-170,95);ctx.lineTo(i*130-90,95);ctx.closePath();ctx.fill()}
+// foul lines and diamond
+ctx.strokeStyle='#f3e8ca';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(450,465);ctx.lineTo(120,130);ctx.moveTo(450,465);ctx.lineTo(780,130);ctx.stroke();
+ctx.fillStyle='#bd8654';ctx.beginPath();ctx.moveTo(450,465);ctx.lineTo(290,305);ctx.lineTo(450,145);ctx.lineTo(610,305);ctx.closePath();ctx.fill();
+ctx.fillStyle='#3a8b4c';ctx.beginPath();ctx.moveTo(450,420);ctx.lineTo(340,310);ctx.lineTo(450,200);ctx.lineTo(560,310);ctx.closePath();ctx.fill();
+// bases
+[[450,465],[290,305],[450,145],[610,305]].forEach(([x,y])=>{ctx.fillStyle='#fff7e7';ctx.fillRect(x-9,y-9,18,18)});
+// mound and plate
+ctx.fillStyle='#b67c4e';ctx.beginPath();ctx.ellipse(450,310,35,19,0,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(450,478);ctx.lineTo(438,468);ctx.lineTo(442,455);ctx.lineTo(458,455);ctx.lineTo(462,468);ctx.closePath();ctx.fill();
+// fielders
+const fs=[[450,160],[220,210],[680,210],[330,260],[570,260],[365,365],[535,365]];
+fs.forEach(([x,y],i)=>{ctx.fillStyle='#e5edf4';ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fill();ctx.fillStyle='#17314b';ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fill()});
+// batter/pitcher
+ctx.fillStyle='#ffd166';ctx.beginPath();ctx.arc(480,450,13,0,Math.PI*2);ctx.fill();ctx.fillRect(472,462,16,27);
+ctx.strokeStyle='#e7c18b';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(488,454);ctx.lineTo(507,432);ctx.stroke();
+ctx.fillStyle='#e76f51';ctx.beginPath();ctx.arc(450,288,11,0,Math.PI*2);ctx.fill();ctx.fillRect(442,299,16,27);
+// aim indicator
+if(state.phase==='bat'||state.phase==='pitch'){ctx.strokeStyle='#ffffff88';ctx.lineWidth=2;ctx.beginPath();ctx.arc(450+state.aim*25,445,25,0,Math.PI*2);ctx.stroke()}
+// ball
+if(state.pitch||state.phase==='field'){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(state.ballX,state.ballY,7,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#d34d4d';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(state.ballX,state.ballY,5,-1,1);ctx.stroke()}
+// fielding player
+if(state.phase==='field'){ctx.strokeStyle='#ffd166';ctx.lineWidth=3;ctx.beginPath();ctx.arc(state.fieldX,state.fieldY,17,0,Math.PI*2);ctx.stroke()}
+// overlay
+if(state.gameOver){ctx.fillStyle='#061321cc';ctx.fillRect(0,0,900,570);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 48px system-ui';ctx.fillText(state.home===state.away?'TIE GAME':state.home>state.away?'HOME TEAM WINS':'AWAY TEAM WINS',450,265);ctx.font='20px system-ui';ctx.fillText('Press R or New Game to play again',450,310)}
+}
+function animate(){state.anim++;if(state.pitch){state.ballX+=state.ballVx;state.ballY+=state.ballVy;state.pitch.t--;if(state.pitch.t<=0){state.pitch=null;if(state.phase==='bat'){state.waiting=false;resolveTake()}else if(state.phase==='pitch'){state.waiting=false;msg('Pitch delivered. The batter is ready.');}}}
+if(state.phase==='field'&&state.flight>0){state.ballX+=state.ballVx;state.ballY+=state.ballVy;state.flight--;if(state.flight<=0){state.waiting=false;finishHit()}}
+draw();requestAnimationFrame(animate)}
+function startPitch(){
+if(state.gameOver||state.waiting)return;
+if(state.phase==='bat'){
+ state.pitch={t:65};state.ballX=450;state.ballY=285;state.ballVx=0;state.ballVy=2.5;
+ state.waiting=true;state.swingWindow=false;
+ msg('Pitch on the way… time your swing!');$('timingMeter').style.width='0%';
+ let start=performance.now();let tick=()=>{if(!state.pitch)return;let p=Math.min(100,(performance.now()-start)/650*100);$('timingMeter').style.width=p+'%';if(p<100)requestAnimationFrame(tick)};tick();
+}else if(state.phase==='pitch'){throwPitch()}
+else if(state.phase==='field'){finishHit()}
+}
+function resolveTake(){
+state.pitch=null;state.ballX=450;state.ballY=310;
+// AI pitch location and call
+let strike=Math.random()<.63;
+if(strike){state.strikes++;msg('Called strike!');log('Called strike.')}
+else{state.balls++;msg('Ball. Take your base at four.');log('Ball outside the zone.')}
+if(state.strikes>=3){state.outs++;state.ks++;state.strikes=0;state.balls=0;msg('Strike three! Batter is out.');log('Strikeout.')}
+if(state.balls>=4){state.bases=Math.min(3,state.bases+1);state.balls=0;state.strikes=0;msg('Walk! Batter takes first.');log('Walk.')}
+afterCount();
+}
+function swing(){
+if(state.phase!=='bat'||!state.pitch||!state.waiting)return;
+let y=state.ballY;let diff=Math.abs(y-430);let quality=Math.max(0,1-diff/100);
+let contact=Math.random()<(.25+quality*.7);
+state.pitch=null;state.waiting=false;
+if(contact){
+ let power=quality*rand(.6,1.4);let distance=power*rand(210,390);
+ state.hits++;let isHR=distance>340&&Math.random()<.7;
+ state.ballX=450;state.ballY=430;state.ballVx=(state.aim*2.3+rand(-1.2,1.2))*3;state.ballVy=-rand(4.5,8);
+ state.flight=45;state.phase='field';state.waiting=true;state.hitType=isHR?'home run':distance>280?'extra-base hit':'single';
+ msg(quality>.75?'Crushed! The ball is in play!':'Contact! The ball is in play!');log('Ball put in play.');
+}else{
+ state.strikes++;msg('Swing and a miss!');log('Swing and a miss.');
+ if(state.strikes>=3){state.outs++;state.ks++;state.strikes=0;state.balls=0;msg('Strike three!');}
+ afterCount();
+}
+}
+function finishHit(){
+state.flight=0;state.waiting=false;
+let type=state.hitType||'single';
+if(type==='home run'){let runs=1+state.bases;state.home+=state.half===0?0:runs;state.away+=state.half===0?runs:0;state.bases=0;state.hrs++;msg(`HOME RUN! ${runs} run${runs>1?'s':''} score!`);log(`Home run — ${runs} run(s).`)}
+else{state.bases=Math.min(3,state.bases+1);if(state.bases===3&&type==='extra-base hit'){let runs=state.half===0?1:1; if(state.half===0)state.away+=runs;else state.home+=runs;state.bases=0;msg('Run scores on the hit!')}else msg(type==='extra-base hit'?'Extra-base hit!':'Single!');log(type+'.')}
+state.phase='bat';state.hitType=null;state.aim=0;afterCount(true);
+}
+function afterCount(hit=false){
+update();
+if(state.outs>=3){state.outs=0;state.balls=0;state.strikes=0;state.bases=0;
+ if(state.half===0){state.half=1;state.phase='pitch';msg('Side retired. You are pitching in the bottom half.');log('Teams switch sides.')}
+ else{state.half=0;state.inning++;state.phase='bat';msg('Inning complete. Back to batting.');log('New inning.')}
+ if(state.inning>3){state.gameOver=true;msg('Game over!');}
+}
+update();
+}
+function throwPitch(){
+if(state.waiting)return;
+state.waiting=true;state.pitch={t:45};state.ballX=450;state.ballY=288;state.ballVx=state.aim*.4;state.ballVy=3.4;
+$('speed').textContent=Math.round(rand(88,99));msg('You deliver the pitch…');log('Pitch thrown.');
+setTimeout(()=>{if(state.phase!=='pitch')return;state.pitch=null;state.waiting=false;
+ if(Math.random()<.35){state.outs++;msg('The batter grounds out!');log('Groundout.');afterCount()}
+ else{state.phase='field';state.ballX=450;state.ballY=330;state.ballVx=rand(-5,5);state.ballVy=rand(2,5);state.flight=25;state.waiting=true;msg('Ball in play! Move your fielder with the arrow keys.')}
+},750);
+}
+function reset(){state={inning:1,half:0,outs:0,balls:0,strikes:0,home:0,away:0,hits:0,ks:0,hrs:0,bases:0,phase:'bat',pitching:false,pitch:null,pitchX:0,pitchY:0,aim:0,fieldX:450,fieldY:260,ballX:450,ballY:310,ballVx:0,ballVy:0,flight:0,anim:0,gameOver:false,waiting:false,scoreThisPlay:false};$('log').innerHTML='• First pitch coming up.';msg('New game! Step into the batter’s box.');$('speed').textContent='92';update()}
+document.addEventListener('keydown',e=>{
+if(['ArrowLeft','ArrowRight',' ','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();
+if(e.key.toLowerCase()==='r'){reset();return}
+if(e.key==='ArrowLeft'||e.key==='ArrowRight'){let d=e.key==='ArrowLeft'?-1:1;if(state.phase==='field'){state.fieldX=Math.max(80,Math.min(820,state.fieldX+d*22));state.fieldY=Math.max(120,Math.min(450,state.fieldY));}else state.aim=Math.max(-3,Math.min(3,state.aim+d));}
+if(e.key==='ArrowUp'&&state.phase==='field')state.fieldY-=20;
+if(e.key==='ArrowDown'&&state.phase==='field')state.fieldY+=20;
+if(e.code==='Space'){if(state.phase==='bat')swing();else if(state.phase==='pitch')throwPitch();else if(state.phase==='field'){state.waiting=false;finishHit()}}
+if(['1','2','3'].includes(e.key)&&state.phase==='pitch'){state.pitchType=e.key;msg(['Fastball selected','Curveball selected','Changeup selected'][+e.key-1])}
+});
+$('actionBtn').onclick=startPitch;$('newBtn').onclick=reset;update();draw();requestAnimationFrame(animate);
+</script>
+</body></html
+           
+ 
